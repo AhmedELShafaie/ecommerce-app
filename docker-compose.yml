@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  product-service:
+    build: { context: ., dockerfile: product-service/Dockerfile }
+    ports: ["50051:50051"]
+    working_dir: /app
+    command: ["./product-service"]
+    environment:
+      - GODEBUG=netdns=cgo
+
+  order-service:
+    build: { context: ., dockerfile: order-service/Dockerfile }
+    ports: ["50052:50052"]
+    volumes: ["./proto:/proto:ro"]
+    working_dir: /app
+    command: ["node", "dist/index.js"]
+    environment:
+      - NODE_ENV=production
+      - PROTO_DIR=/proto
+
+  user-service:
+    build: { context: ., dockerfile: user-service/Dockerfile }
+    ports: ["50053:50053"]
+    working_dir: /app
+    command: ["./venv/bin/python", "server.py"]
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  cart-service:
+    build: { context: ., dockerfile: cart-service/Dockerfile }
+    ports: ["50054:50054"]
+    volumes: ["./proto:/proto:ro"]
+    working_dir: /app
+    command: ["node", "dist/index.js"]
+    environment:
+      - PRODUCT_SERVICE_URL=product-service:50051
+      - PROTO_DIR=/proto
+
+  api-gateway:
+    build: { context: ., dockerfile: api-gateway/Dockerfile }
+    ports: ["3000:3000"]
+    volumes: ["./proto:/proto:ro"]
+    working_dir: /app
+    command: ["node", "dist/index.js"]
+    environment:
+      - PORT=3000
+      - PROTO_DIR=/proto
+      - PRODUCT_SERVICE_URL=product-service:50051
+      - ORDER_SERVICE_URL=order-service:50052
+      - USER_SERVICE_URL=user-service:50053
+      - CART_SERVICE_URL=cart-service:50054
+    depends_on: [product-service, order-service, user-service, cart-service]

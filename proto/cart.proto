@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package cart;
+
+option go_package = "ecommerce-app/proto/cart;cart";
+
+service CartService {
+  rpc GetCart(GetCartRequest) returns (Cart);
+  rpc AddItem(AddItemRequest) returns (Cart);
+  rpc RemoveItem(RemoveItemRequest) returns (Cart);
+  rpc ClearCart(ClearCartRequest) returns (Cart);
+}
+
+message CartItem {
+  string product_id = 1;
+  string product_name = 2;
+  int32 quantity = 3;
+  double unit_price = 4;
+}
+
+message Cart {
+  string user_id = 1;
+  repeated CartItem items = 2;
+  double total = 3;
+}
+
+message GetCartRequest {
+  string user_id = 1;
+}
+
+message AddItemRequest {
+  string user_id = 1;
+  string product_id = 2;
+  int32 quantity = 3;
+}
+
+message RemoveItemRequest {
+  string user_id = 1;
+  string product_id = 2;
+}
+
+message ClearCartRequest {
+  string user_id = 1;
+}

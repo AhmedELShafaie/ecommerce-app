@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>E-Commerce Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f0f12;
+      --surface: #18181c;
+      --border: #2a2a2e;
+      --text: #e4e4e7;
+      --muted: #71717a;
+      --accent: #a78bfa;
+      --accent-dim: #7c3aed;
+      --success: #34d399;
+      --danger: #f87171;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'DM Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    .container { max-width: 960px; margin: 0 auto; padding: 2rem; }
+    h1 { font-size: 1.75rem; margin-bottom: 1.5rem; color: var(--accent); }
+    h2 { font-size: 1.1rem; margin: 1.5rem 0 0.75rem; color: var(--muted); font-weight: 600; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+    .product-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .product-card .name { font-weight: 600; }
+    .product-card .price { font-family: 'JetBrains Mono', monospace; color: var(--accent); }
+    .product-card .stock { font-size: 0.85rem; color: var(--muted); }
+    button, input, select {
+      font-family: inherit;
+      font-size: 0.9rem;
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+    }
+    button {
+      cursor: pointer;
+      background: var(--accent-dim);
+      color: white;
+      border: none;
+      font-weight: 600;
+    }
+    button:hover { background: var(--accent); }
+    button.secondary { background: var(--border); color: var(--text); }
+    button.danger { background: var(--danger); }
+    input { width: 100%; max-width: 200px; }
+    .flex { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .cart-items { list-style: none; }
+    .cart-items li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .error { color: var(--danger); font-size: 0.9rem; margin-top: 0.5rem; }
+    .success { color: var(--success); font-size: 0.9rem; margin-top: 0.5rem; }
+    #apiBase { max-width: 400px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>E-Commerce Demo (gRPC Microservices)</h1>
+    <div class="card">
+      <label for="apiBase">API base URL:</label>
+      <input type="text" id="apiBase" value="/api" placeholder="/api or http://localhost:3000/api">
+    </div>
+
+    <h2>Products</h2>
+    <div id="products" class="grid"></div>
+    <div class="card">
+      <h3 style="margin-bottom:0.5rem">Create product</h3>
+      <div class="flex" style="gap:0.5rem; flex-wrap:wrap">
+        <input type="text" id="newName" placeholder="Name">
+        <input type="text" id="newDesc" placeholder="Description">
+        <input type="number" id="newPrice" placeholder="Price" step="0.01">
+        <input type="number" id="newStock" placeholder="Stock">
+        <button id="createProduct">Create</button>
+      </div>
+      <p id="productMsg" class="error"></p>
+    </div>
+
+    <h2>Users</h2>
+    <div id="users" class="card"></div>
+    <div class="card">
+      <div class="flex">
+        <input type="text" id="newEmail" placeholder="Email">
+        <input type="text" id="newUserName" placeholder="Name">
+        <button id="createUser">Create User</button>
+      </div>
+      <p id="userMsg" class="error"></p>
+    </div>
+
+    <h2>Cart (select user, then add products)</h2>
+    <div class="card">
+      <div class="flex">
+        <select id="cartUserId"></select>
+        <button id="loadCart">Load Cart</button>
+        <button id="clearCart" class="secondary">Clear Cart</button>
+      </div>
+      <ul id="cartList" class="cart-items"></ul>
+      <p id="cartTotal" style="margin-top:0.5rem"></p>
+      <div class="flex" style="margin-top:0.5rem">
+        <select id="addProductId"></select>
+        <input type="number" id="addQty" value="1" min="1" style="width:60px">
+        <button id="addToCart">Add to Cart</button>
+      </div>
+      <p id="cartMsg" class="error"></p>
+    </div>
+
+    <h2>Orders</h2>
+    <div class="card">
+      <div class="flex">
+        <select id="orderUserId"></select>
+        <button id="placeOrder">Place Order (from cart)</button>
+        <button id="listOrders" class="secondary">List My Orders</button>
+      </div>
+      <div id="ordersList"></div>
+      <p id="orderMsg" class="error"></p>
+    </div>
+  </div>
+
+  <script>
+    function api() {
+      const base = document.getElementById('apiBase').value.replace(/\/$/, '') || '/api';
+      const handle = async (r) => {
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error || r.statusText || 'Request failed');
+        return data;
+      };
+      return {
+        get: (path) => fetch(base + path).then(handle),
+        post: (path, body) => fetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(handle),
+        delete: (path) => fetch(base + path, { method: 'DELETE' }).then(handle),
+      };
+    }
+
+    function msg(elId, text, isError = true) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      el.textContent = text || '';
+      el.className = isError ? 'error' : 'success';
+    }
+
+    async function loadProducts() {
+      const { get } = api();
+      try {
+        const data = await get('/products?page=1&page_size=50');
+        const div = document.getElementById('products');
+        div.innerHTML = (data.products || []).map(p => `
+          <div class="product-card">
+            <span class="name">${p.name}</span>
+            <span class="price">$${p.price?.toFixed(2)}</span>
+            <span class="stock">Stock: ${p.stock}</span>
+            <button onclick="quickAddToCart('${p.id}')">Add to cart</button>
+          </div>
+        `).join('');
+        const sel = document.getElementById('addProductId');
+        const opts = (data.products || []).map(p => `<option value="${p.id}">${p.name} ($${p.price?.toFixed(2)})</option>`).join('');
+        sel.innerHTML = '<option value="">-- Select product --</option>' + opts;
+      } catch (e) {
+        document.getElementById('products').innerHTML = '<p class="error">Failed to load products</p>';
+      }
+    }
+
+    async function loadUsers() {
+      const { get } = api();
+      try {
+        const data = await get('/users?page=1&page_size=50');
+        const users = data.users || [];
+        document.getElementById('users').innerHTML = users.length
+          ? '<ul>' + users.map(u => `<li>${u.name} (${u.email}) - ${u.id}</li>`).join('') + '</ul>'
+          : '<p class="muted">No users yet.</p>';
+        const opt = users.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+        document.getElementById('cartUserId').innerHTML = '<option value="">-- Select user --</option>' + opt;
+        document.getElementById('orderUserId').innerHTML = '<option value="">-- Select user --</option>' + opt;
+      } catch (e) {
+        document.getElementById('users').innerHTML = '<p class="error">Failed to load users</p>';
+      }
+    }
+
+    document.getElementById('createProduct').onclick = async () => {
+      const name = document.getElementById('newName').value;
+      const description = document.getElementById('newDesc').value;
+      const price = document.getElementById('newPrice').value;
+      const stock = document.getElementById('newStock').value;
+      try {
+        await api().post('/products', { name, description, price, stock });
+        msg('productMsg', 'Product created', false);
+        loadProducts();
+      } catch (e) {
+        msg('productMsg', e.message || 'Failed');
+      }
+    };
+
+    document.getElementById('createUser').onclick = async () => {
+      const email = document.getElementById('newEmail').value;
+      const name = document.getElementById('newUserName').value;
+      try {
+        await api().post('/users', { email, name });
+        msg('userMsg', 'User created', false);
+        loadUsers();
+      } catch (e) {
+        msg('userMsg', e.message || 'Failed');
+      }
+    };
+
+    document.getElementById('loadCart').onclick = async () => {
+      const userId = document.getElementById('cartUserId').value;
+      if (!userId) { msg('cartMsg', 'Select a user'); return; }
+      try {
+        const data = await api().get('/cart/' + userId);
+        document.getElementById('cartList').innerHTML = (data.items || []).map(i =>
+          `<li>${i.product_name} x ${i.quantity} @ $${i.unit_price?.toFixed(2)} <button class="secondary" onclick="removeFromCart('${userId}','${i.product_id}')">Remove</button></li>`
+        ).join('') || '<li>Cart is empty</li>';
+        document.getElementById('cartTotal').textContent = 'Total: $' + (data.total?.toFixed(2) ?? '0.00');
+        msg('cartMsg', '');
+      } catch (e) {
+        msg('cartMsg', e.message || 'Failed to load cart');
+      }
+    };
+
+    window.removeFromCart = async (userId, productId) => {
+      try {
+        await api().delete('/cart/' + userId + '/items/' + productId);
+        document.getElementById('loadCart').click();
+      } catch (e) {
+        msg('cartMsg', e.message || 'Failed');
+      }
+    };
+
+    window.quickAddToCart = (productId) => {
+      document.getElementById('addProductId').value = productId;
+      document.getElementById('addQty').value = 1;
+    };
+
+    document.getElementById('addToCart').onclick = async () => {
+      const userId = document.getElementById('cartUserId').value;
+      const productId = document.getElementById('addProductId').value;
+      const quantity = parseInt(document.getElementById('addQty').value) || 1;
+      if (!userId || !productId) { msg('cartMsg', 'Select user and product'); return; }
+      try {
+        await api().post('/cart/' + userId + '/items', { product_id: productId, quantity });
+        msg('cartMsg', 'Added to cart', false);
+        document.getElementById('loadCart').click();
+      } catch (e) {
+        msg('cartMsg', e.message || 'Failed');
+      }
+    };
+
+    document.getElementById('clearCart').onclick = async () => {
+      const userId = document.getElementById('cartUserId').value;
+      if (!userId) return;
+      try {
+        await api().delete('/cart/' + userId);
+        document.getElementById('loadCart').click();
+      } catch (e) {
+        msg('cartMsg', e.message || 'Failed');
+      }
+    };
+
+    document.getElementById('placeOrder').onclick = async () => {
+      const userId = document.getElementById('orderUserId').value;
+      if (!userId) { msg('orderMsg', 'Select a user'); return; }
+      try {
+        const cart = await api().get('/cart/' + userId);
+        const items = (cart.items || []).map(i => ({ product_id: i.product_id, product_name: i.product_name, quantity: i.quantity, unit_price: i.unit_price }));
+        if (items.length === 0) { msg('orderMsg', 'Cart is empty'); return; }
+        const order = await api().post('/orders', { user_id: userId, items, total: cart.total });
+        msg('orderMsg', 'Order placed: ' + order.id, false);
+        document.getElementById('listOrders').click();
+      } catch (e) {
+        msg('orderMsg', e.message || 'Failed');
+      }
+    };
+
+    document.getElementById('listOrders').onclick = async () => {
+      const userId = document.getElementById('orderUserId').value;
+      if (!userId) { msg('orderMsg', 'Select a user'); return; }
+      try {
+        const data = await api().get('/orders/user/' + userId + '?page=1&page_size=20');
+        document.getElementById('ordersList').innerHTML = (data.orders || []).length
+          ? '<ul>' + data.orders.map(o => `<li>Order ${o.id} - $${o.total?.toFixed(2)} - ${o.status}</li>`).join('') + '</ul>'
+          : '<p class="muted">No orders.</p>';
+        msg('orderMsg', '');
+      } catch (e) {
+        msg('orderMsg', e.message || 'Failed');
+      }
+    };
+
+    loadProducts();
+    loadUsers();
+  </script>
+</body>
+</html>
