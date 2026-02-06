@@ -4,7 +4,7 @@ COPY product-service/go.mod product-service/go.sum ./
 RUN go mod download
 COPY product-service/ ./
 COPY proto/ ./proto/
-RUN CGO_ENABLED=1 go build -o bin/product-service .
+RUN CGO_ENABLED=0 go build -o bin/product-service .
 
 FROM alpine:3.19
 RUN apk add --no-cache ca-certificates
